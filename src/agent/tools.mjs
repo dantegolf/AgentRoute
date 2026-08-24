@@ -1,6 +1,6 @@
 import { readFile, writeFile, readdir, stat, realpath, mkdir } from 'node:fs/promises';
 import { existsSync, realpathSync } from 'node:fs';
-import { resolve, relative, dirname, sep, isAbsolute } from 'node:path';
+import { resolve, relative, dirname, sep } from 'node:path';
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -51,13 +51,24 @@ export const TOOL_DEFINITIONS = [
 ];
 
 function comparablePath(path) {
-  const normalized = resolve(path);
-  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  let value = String(path);
+  if (process.platform === 'win32') {
+    // Node/fs may expose the same Windows path with an extended-length prefix.
+    // Normalize both forms before containment checks:
+    //   \\?\C:\foo        -> C:\foo
+    //   \\?\UNC\s\share -> \\s\share
+    if (/^\\\\\?\\UNC\\/i.test(value)) value = `\\\\${value.slice(8)}`;
+    else if (/^\\\\\?\\/i.test(value)) value = value.slice(4);
+    value = value.replaceAll('/', '\\').toLowerCase();
+    return value.replace(/\\+$/, '');
+  }
+  return resolve(value);
 }
 
 function insideRoot(root, path) {
-  const rel = relative(comparablePath(root), comparablePath(path));
-  return rel === '' || (!isAbsolute(rel) && !rel.startsWith(`..${sep}`) && rel !== '..');
+  const base = comparablePath(root);
+  const candidate = comparablePath(path);
+  return candidate === base || candidate.startsWith(`${base}${sep}`);
 }
 
 function sanitizedEnv() {
@@ -73,9 +84,7 @@ export function createToolRuntime({ root, allowShell = true }) {
   root = resolve(root);
   if (!existsSync(root)) throw new Error(`Workspace does not exist: ${root}`);
   // Canonicalize the workspace before comparing real paths. macOS commonly
-  // exposes /var through /private/var, while Windows path casing can differ
-  // between resolve() and realpath(). Both are legitimate representations of
-  // the same path and must not be mistaken for a symlink escape.
+  // exposes /var through /private/var; Windows realpath can use \\?\ prefixes.
   root = realpathSync(root);
 
   async function safePath(input, allowMissing = false) {
