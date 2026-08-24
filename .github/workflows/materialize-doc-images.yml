@@ -1,0 +1,38 @@
+name: Materialize documentation screenshots
+
+on:
+  push:
+    branches: [docs/bilingual-readme]
+    paths:
+      - '.docs-assets/**'
+      - '.github/workflows/materialize-doc-images.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/bilingual-readme
+      - name: Decode real WebUI screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/images
+          cat .docs-assets/overview.part.* | base64 --decode > docs/images/overview.webp
+          cat .docs-assets/providers.part.* | base64 --decode > docs/images/providers.webp
+          file docs/images/overview.webp docs/images/providers.webp
+      - name: Commit screenshots and remove temporary materialization files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .docs-assets
+          rm -f .github/workflows/materialize-doc-images.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Add WebUI documentation screenshots'
+          git push origin HEAD:docs/bilingual-readme
