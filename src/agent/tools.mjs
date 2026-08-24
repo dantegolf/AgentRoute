@@ -1,6 +1,6 @@
 import { readFile, writeFile, readdir, stat, realpath, mkdir } from 'node:fs/promises';
 import { existsSync, realpathSync } from 'node:fs';
-import { resolve, relative, dirname, sep } from 'node:path';
+import { resolve, relative, dirname, sep, isAbsolute } from 'node:path';
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -50,9 +50,14 @@ export const TOOL_DEFINITIONS = [
   },
 ];
 
+function comparablePath(path) {
+  const normalized = resolve(path);
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
 function insideRoot(root, path) {
-  const rel = relative(root, path);
-  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..');
+  const rel = relative(comparablePath(root), comparablePath(path));
+  return rel === '' || (!isAbsolute(rel) && !rel.startsWith(`..${sep}`) && rel !== '..');
 }
 
 function sanitizedEnv() {
@@ -67,9 +72,10 @@ function sanitizedEnv() {
 export function createToolRuntime({ root, allowShell = true }) {
   root = resolve(root);
   if (!existsSync(root)) throw new Error(`Workspace does not exist: ${root}`);
-  // macOS commonly exposes /var as a symlink to /private/var. Compare all
-  // resolved tool paths against the canonical workspace root so a legitimate
-  // path is not mistaken for a symlink escape.
+  // Canonicalize the workspace before comparing real paths. macOS commonly
+  // exposes /var through /private/var, while Windows path casing can differ
+  // between resolve() and realpath(). Both are legitimate representations of
+  // the same path and must not be mistaken for a symlink escape.
   root = realpathSync(root);
 
   async function safePath(input, allowMissing = false) {
