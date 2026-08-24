@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AgentRoute</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="mark">AR</span><div><strong>AgentRoute</strong><small>worker control plane</small></div></div>
+      <nav>
+        <button data-view="dashboard" class="active">Overview</button>
+        <button data-view="providers">Providers</button>
+        <button data-view="workers">Workers</button>
+        <button data-view="tasks">Tasks</button>
+        <button data-view="codex">Codex</button>
+      </nav>
+      <div class="sidebar-foot"><span id="healthDot" class="dot"></span><span id="healthText">connecting…</span></div>
+    </aside>
+
+    <main>
+      <header><div><p class="eyebrow">LOCAL AI WORKFORCE</p><h1 id="viewTitle">Overview</h1></div><button id="refreshBtn" class="ghost">Refresh</button></header>
+
+      <section id="dashboard" class="view active">
+        <div class="hero">
+          <div><p class="eyebrow">SUPERVISOR → WORKERS</p><h2>Keep Codex in charge.<br>Hire any model for the implementation.</h2><p>AgentRoute normalizes providers, runs coding workers, records evidence, and hands the diff back for independent review.</p></div>
+          <div class="flow"><span>Codex</span><b>→</b><span>AgentRoute</span><b>→</b><span>Any model</span></div>
+        </div>
+        <div class="metrics">
+          <article><small>Providers</small><strong id="providerCount">0</strong></article>
+          <article><small>Workers</small><strong id="workerCount">0</strong></article>
+          <article><small>Tasks</small><strong id="taskCount">0</strong></article>
+          <article><small>In review</small><strong id="reviewCount">0</strong></article>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><p class="eyebrow">QUICK DISPATCH</p><h3>Delegate implementation</h3></div></div>
+          <form id="taskForm" class="form-grid">
+            <label>Repository path<input name="repo" required placeholder="/Users/me/project"></label>
+            <label>Worker<select name="worker" id="taskWorker" required></select></label>
+            <label class="wide">Task<textarea name="task" required rows="5" placeholder="Implement the agreed retry policy, preserve the public API, add regression tests…"></textarea></label>
+            <label>Workspace<select name="workspaceMode"><option value="current">Current checkout</option><option value="worktree">Isolated worktree</option></select></label>
+            <div class="actions"><button type="submit">Dispatch worker</button></div>
+          </form>
+          <pre id="dispatchResult" class="result hidden"></pre>
+        </div>
+      </section>
+
+      <section id="providers" class="view">
+        <div class="split">
+          <div class="panel"><div class="panel-head"><div><p class="eyebrow">CONNECTIONS</p><h3>Provider registry</h3></div></div><div id="providerList" class="stack"></div></div>
+          <div class="panel"><div class="panel-head"><div><p class="eyebrow">ADD PROVIDER</p><h3>Compatible API</h3></div></div>
+            <form id="providerForm" class="form-stack">
+              <label>ID<input name="id" required placeholder="my-router"></label>
+              <label>Label<input name="label" required placeholder="My Router"></label>
+              <label>Protocol<select name="protocol" id="providerProtocol"></select></label>
+              <label>Base URL<input name="baseUrl" required placeholder="https://api.example.com/v1"></label>
+              <label>Credential env var<input name="apiKeyEnv" placeholder="MY_ROUTER_API_KEY"></label>
+              <button type="submit">Save provider</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="workers" class="view">
+        <div class="split">
+          <div class="panel"><div class="panel-head"><div><p class="eyebrow">PROFILES</p><h3>Worker profiles</h3></div></div><div id="workerList" class="stack"></div></div>
+          <div class="panel"><div class="panel-head"><div><p class="eyebrow">ADD WORKER</p><h3>Model + policy</h3></div></div>
+            <form id="workerForm" class="form-stack">
+              <label>ID<input name="id" required placeholder="fast-gemini"></label>
+              <label>Provider<select name="provider" id="workerProvider"></select></label>
+              <label>Model<input name="model" id="workerModel" list="workerModelOptions" required placeholder="model-id-from-provider"><datalist id="workerModelOptions"></datalist></label>
+              <div class="row"><button id="discoverModelsBtn" type="button" class="ghost">Discover provider models</button><small id="modelDiscoveryStatus" class="muted"></small></div>
+              <label>Max turns<input name="maxTurns" type="number" min="1" max="64" value="24"></label>
+              <label class="check"><input name="allowShell" type="checkbox" checked> Allow shell tool</label>
+              <button type="submit">Save worker</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="tasks" class="view">
+        <div class="panel"><div class="panel-head"><div><p class="eyebrow">EXECUTION HISTORY</p><h3>Worker tasks</h3></div></div><div id="taskList" class="stack"></div></div>
+      </section>
+
+      <section id="codex" class="view">
+        <div class="hero compact"><div><p class="eyebrow">CODEX INTEGRATION</p><h2>Skill first. Global policy optional.</h2><p>Explicit delegation works with the skill alone. Enable automatic delegation only when you want Codex to proactively hand off suitable implementation subtasks.</p></div></div>
+        <div class="split">
+          <div class="panel"><p class="eyebrow">SKILL</p><h3>agentroute-delegate</h3><p id="skillStatus">Checking…</p><button id="installSkillBtn">Install global skill</button></div>
+          <div class="panel"><p class="eyebrow">AUTO DELEGATION</p><h3>Global supervisor policy</h3><p id="autoStatus">Checking…</p><div class="row"><button id="autoOnBtn">Enable</button><button id="autoOffBtn" class="ghost">Disable</button></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

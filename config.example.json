@@ -1,0 +1,49 @@
+{
+  "server": { "host": "127.0.0.1", "port": 19777 },
+  "providers": {
+    "claudegravity": {
+      "label": "ClaudeGravity",
+      "protocol": "anthropic-messages",
+      "baseUrl": "http://127.0.0.1:18080",
+      "auth": { "type": "static", "value": "antigravity" }
+    },
+    "omnirouter": {
+      "label": "Omni Router",
+      "protocol": "openai-responses",
+      "baseUrl": "https://api.omnirouter.ru/v1",
+      "auth": { "type": "env", "name": "OMNIROUTER_API_KEY" },
+      "request": { "store": false }
+    },
+    "openrouter": {
+      "label": "OpenRouter",
+      "protocol": "openai-chat",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "auth": { "type": "env", "name": "OPENROUTER_API_KEY" }
+    },
+    "gemini": {
+      "label": "Google Gemini API",
+      "protocol": "openai-chat",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "auth": { "type": "env", "name": "GEMINI_API_KEY" },
+      "headers": { "x-goog-api-client": "agentroute/0.1.0" }
+    }
+  },
+  "workers": {
+    "gemini-local": {
+      "provider": "claudegravity",
+      "model": "gemini-3.1-pro-high",
+      "maxTurns": 24,
+      "allowShell": true
+    },
+    "gemini-api": {
+      "provider": "gemini",
+      "model": "gemini-3.7-flash",
+      "maxTurns": 24,
+      "allowShell": true
+    }
+  },
+  "defaults": {
+    "worker": "gemini-local",
+    "workspaceMode": "worktree"
+  }
+}
