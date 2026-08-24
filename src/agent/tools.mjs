@@ -1,5 +1,5 @@
 import { readFile, writeFile, readdir, stat, realpath, mkdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { resolve, relative, dirname, sep } from 'node:path';
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -67,6 +67,10 @@ function sanitizedEnv() {
 export function createToolRuntime({ root, allowShell = true }) {
   root = resolve(root);
   if (!existsSync(root)) throw new Error(`Workspace does not exist: ${root}`);
+  // macOS commonly exposes /var as a symlink to /private/var. Compare all
+  // resolved tool paths against the canonical workspace root so a legitimate
+  // path is not mistaken for a symlink escape.
+  root = realpathSync(root);
 
   async function safePath(input, allowMissing = false) {
     const abs = resolve(root, input || '.');
