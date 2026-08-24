@@ -1,5 +1,5 @@
-import { readFile, writeFile, readdir, stat, realpath, mkdir } from 'node:fs/promises';
-import { existsSync, realpathSync } from 'node:fs';
+import { readFile, writeFile, readdir, stat, lstat, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { resolve, relative, dirname, sep } from 'node:path';
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -50,25 +50,9 @@ export const TOOL_DEFINITIONS = [
   },
 ];
 
-function comparablePath(path) {
-  let value = String(path);
-  if (process.platform === 'win32') {
-    // Node/fs may expose the same Windows path with an extended-length prefix.
-    // Normalize both forms before containment checks:
-    //   \\?\C:\foo        -> C:\foo
-    //   \\?\UNC\s\share -> \\s\share
-    if (/^\\\\\?\\UNC\\/i.test(value)) value = `\\\\${value.slice(8)}`;
-    else if (/^\\\\\?\\/i.test(value)) value = value.slice(4);
-    value = value.replaceAll('/', '\\').toLowerCase();
-    return value.replace(/\\+$/, '');
-  }
-  return resolve(value);
-}
-
 function insideRoot(root, path) {
-  const base = comparablePath(root);
-  const candidate = comparablePath(path);
-  return candidate === base || candidate.startsWith(`${base}${sep}`);
+  const rel = relative(root, path);
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..');
 }
 
 function sanitizedEnv() {
@@ -83,26 +67,25 @@ function sanitizedEnv() {
 export function createToolRuntime({ root, allowShell = true }) {
   root = resolve(root);
   if (!existsSync(root)) throw new Error(`Workspace does not exist: ${root}`);
-  // Canonicalize the workspace before comparing real paths. macOS commonly
-  // exposes /var through /private/var; Windows realpath can use \\?\ prefixes.
-  root = realpathSync(root);
 
   async function safePath(input, allowMissing = false) {
     const abs = resolve(root, input || '.');
     if (!insideRoot(root, abs)) throw new Error(`Path escapes workspace: ${input}`);
-    if (!allowMissing) {
-      const rp = await realpath(abs);
-      if (!insideRoot(root, rp)) throw new Error(`Symlink escapes workspace: ${input}`);
-      return rp;
+
+    const rel = relative(root, abs);
+    if (!rel) return abs;
+
+    let current = root;
+    for (const part of rel.split(sep).filter(Boolean)) {
+      current = resolve(current, part);
+      try {
+        const info = await lstat(current);
+        if (info.isSymbolicLink()) throw new Error(`Symlink paths are not allowed inside workspace: ${input}`);
+      } catch (error) {
+        if (allowMissing && error?.code === 'ENOENT') return abs;
+        throw error;
+      }
     }
-    let ancestor = dirname(abs);
-    while (!existsSync(ancestor)) {
-      const next = dirname(ancestor);
-      if (next === ancestor || !insideRoot(root, next)) throw new Error(`Parent escapes workspace: ${input}`);
-      ancestor = next;
-    }
-    const parent = await realpath(ancestor);
-    if (!insideRoot(root, parent)) throw new Error(`Parent escapes workspace: ${input}`);
     return abs;
   }
 
@@ -140,7 +123,7 @@ export function createToolRuntime({ root, allowShell = true }) {
         if (results.length >= max) return;
         for (const entry of await readdir(dir, { withFileTypes: true })) {
           if (results.length >= max) break;
-          if (skip.has(entry.name)) continue;
+          if (skip.has(entry.name) || entry.isSymbolicLink()) continue;
           const path = resolve(dir, entry.name);
           if (!insideRoot(root, path)) continue;
           if (entry.isDirectory()) { await walk(path); continue; }
@@ -163,7 +146,7 @@ export function createToolRuntime({ root, allowShell = true }) {
       if (/\bgit\s+(push|commit|reset\s+--hard|clean\s+-[^\n]*f)/i.test(command)) {
         throw new Error('Blocked destructive/publishing git command. The supervisor owns commit/push/reset/clean.');
       }
-      if (/\b(rm|del|rmdir)\b[^\n]*(\.|\\)(\.\.|~|Users|home|etc|Windows)/i.test(command)) {
+      if (/\b(rm|del|rmdir)\b[^\n]*(\/|\\)(\.\.|~|Users|home|etc|Windows)/i.test(command)) {
         throw new Error('Blocked suspicious destructive path operation outside the workspace.');
       }
       const timeout = Math.min(Math.max(Number(input.timeout_ms || 120000), 1000), 600000);
